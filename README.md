@@ -10,7 +10,7 @@ Caster
 <p>There is a dependency on a web app that needs to be <a href="https://developers.google.com/cast/whitelisting#whitelist-receiver">registered with Google</a>.</p>
 
 <p>Caster provides several command line options which are self-documented with the '-h' option:
-<blockquote>
+```
 java -jar caster.jar -h
 usage: java -jar caster.jar [-d <arg>] [-f <arg>] [-h] [-id <arg>] [-l] [-s]
        [-t] [-tp <arg>] [-v] [-V]
@@ -25,7 +25,8 @@ usage: java -jar caster.jar [-d <arg>] [-f <arg>] [-h] [-id <arg>] [-l] [-s]
   -tp,--transcode-parameters <arg>  Transcode parameters; -t also required
   -v,--verbose                      Verbose logging
   -V,--version                      Print version information
-</blockquote></p>
+```
+</p>
 
 <p>Here are some examples of using Caster:
 <ul>
@@ -34,7 +35,6 @@ usage: java -jar caster.jar [-d <arg>] [-f <arg>] [-h] [-id <arg>] [-l] [-s]
 java -jar caster.jar -l
 </blockquote>
 </li>
-<ul>
 <li>Play a stream from the internet on the ChromeCast device with IP address 192.168.0.22:
 <blockquote>
 java -jar caster.jar -d 192.168.0.22 -s "http://commondatastorage.googleapis.com/gtv-videos-bucket/big_buck_bunny_1080p.mp4"

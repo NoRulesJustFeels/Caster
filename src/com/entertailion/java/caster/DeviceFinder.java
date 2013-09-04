@@ -25,6 +25,10 @@ import org.apache.http.HttpResponse;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLReader;
 
+/**
+ * @author leon_nicholls
+ * 
+ */
 public class DeviceFinder implements BroadcastDiscoveryHandler {
 
 	private static final String LOG_TAG = "DeviceFinder";

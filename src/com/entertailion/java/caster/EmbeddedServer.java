@@ -16,6 +16,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Enumeration;
 import java.util.Properties;
 
 /**
@@ -30,14 +31,44 @@ public class EmbeddedServer extends HttpServer {
 	public static final int HTTP_PORT = 8080;
 	public static final String CURRENT_FILE = "current.file";
 	private static final int BUFFER_SIZE = 1024 * 500;
+	private WebListener webListener;
 
 	public EmbeddedServer(int port) throws IOException {
 		super(port);
+	}
+	
+	public void setWebListener(WebListener webListener) {
+		this.webListener = webListener;
 	}
 
 	public Response serve(String uri, String method, Properties header, Properties parms, Properties files) {
 		try {
 			Log.d(LOG_TAG, method + " '" + uri + "' ");
+			
+			Enumeration e = header.propertyNames();
+			while (e.hasMoreElements()) {
+				String value = (String) e.nextElement();
+				Log.d(LOG_TAG, "  HDR: '" + value + "' = '" + header.getProperty(value) + "'");
+			}
+			e = parms.propertyNames();
+			while (e.hasMoreElements()) {
+				String value = (String) e.nextElement();
+				Log.d(LOG_TAG, "  PRM: '" + value + "' = '" + parms.getProperty(value) + "'");
+			}
+			e = files.propertyNames();
+			while (e.hasMoreElements()) {
+				String value = (String) e.nextElement();
+				Log.d(LOG_TAG, "  UPLOADED: '" + value + "' = '" + files.getProperty(value) + "'");
+			}
+			
+			if (webListener!=null) {
+				String[] uris = webListener.uriPrefixes();
+				for(String u:uris) {
+					if (uri.startsWith(u)) {
+						return webListener.handleRequest(uri, method, header, parms);
+					}
+				}
+			}
 
 			/*
 			 * TODO if ("POST".equalsIgnoreCase(method)){ Log.d(LOG_TAG,

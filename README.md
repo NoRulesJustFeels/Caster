@@ -12,15 +12,15 @@ Caster
 Caster provides several command line options which are self-documented with the '-h' option:
 ```
 java -jar caster.jar -h
-usage: java -jar caster.jar [-d <arg>] [-f <arg>] [-h] [-id <arg>] [-l] [-s]
-       [-t] [-tp <arg>] [-v] [-V]
+usage: java -jar caster.jar [-d <arg>] [-f <arg>] [-h] [-id <arg>] [-l] [-r]
+       [-s] [-t] [-tp <arg>] [-v] [-V]
   -d,--device <arg>                 ChromeCast device IP address
   -f,--file <arg>                   Local media file; -d also required
   -h,--help                         Print this help message
   -id,--app-id <arg>                App ID for whitelisted device
   -l,--list                         List ChromeCast devices
-  -s,--stream                       HTTP URL for streaming content; -d also
-                                    required
+  -r,--rest                         REST API server
+  -s,--stream                       HTTP URL for streaming content; -d also required
   -t,--transcode                    Transcode media; -f also required
   -tp,--transcode-parameters <arg>  Transcode parameters; -t also required
   -v,--verbose                      Verbose logging
@@ -54,7 +54,72 @@ java -jar caster.jar -d 192.168.0.22 -t -f "/Users/leon_nicholls/Downloads/video
 java -jar caster.jar -d 192.168.0.22 -t -tp "vcodec=VP80,vb=2000,vfilter=canvas{width=640,height=360}, acodec=vorb,ab=128,channels=2,samplerate=44100,threads=2" -f "/Users/leon_nicholls/Downloads/video.wmv"
 </blockquote>
 </li>
+<li>Start the REST API server:
+<blockquote>
+java -jar caster.jar -r
+</blockquote>
+</li>
 </ul>
+
+<p>
+When the REST API server is launched, Caster will keep running and will not exit as with all the other command-line options. The REST API server supports HTTP GET and POST operations to query and control media playback.
+Here are the HTTP requests supported:
+<ul>
+<li>List devices (HTTP GET: /devices):
+<blockquote>
+curl -i -X GET http://192.168.0.50:8080/devices
+</blockquote>
+With a JSON array response:
+<blockquote>
+[{"ip_address":"192.168.0.22","name":"Living Room"}]
+</blockquote>
+</li>
+<li>Playback status (HTTP GET: /playback):
+<blockquote>
+curl -i -X GET http://192.168.0.50:8080/playback?device=192.168.0.22	
+</blockquote>
+With a JSON object response (state value can be "idle", "playing" or "stopped"):
+<blockquote>
+{"duration":27,"time":12,"state":"playing"}
+</blockquote>
+</li>
+<li>Play stream (HTTP POST: /playback):
+<blockquote>
+curl -i -X POST -d "device=192.168.0.22&stream=http://commondatastorage.googleapis.com/gtv-videos-bucket/big_buck_bunny_1080p.mp4" http://192.168.0.50:8080/playback
+</blockquote>
+</li>
+<li>Play file (HTTP POST: /playback):
+<blockquote>
+curl -i -X POST -d "device=192.168.0.22&file=/Users/leon_nicholls/Downloads/video.mp4" http://192.168.0.50:8080/playback
+</blockquote>
+</li>
+<li>Transcode file (HTTP POST: /playback):
+<blockquote>
+curl -i -X POST -d "device=192.168.0.22&file=/Users/leon_nicholls/Downloads/video.wmv&transcode=true" http://192.168.0.50:8080/playback
+</blockquote>
+</li>
+<li>Transcode file with custom VLC URL encoded transcoding parameters (HTTP POST: /playback):
+<blockquote>
+curl -i -X POST -d "device=192.168.0.22&file=/Users/leon_nicholls/Downloads/video.wmv&transcode=true&transcode-parameters=vcodec%3DVP80%2Cvb%3D2000%2Cvfilter%3Dcanvas%7Bwidth%3D640%2Cheight%3D360%7D%2C+acodec%3Dvorb%2Cab%3D128%2Cchannels%3D2%2Csamplerate%3D44100%2Cthreads%3D2" http://192.168.0.50:8080/playback
+</blockquote>
+</li>
+<li>Pause playback state (HTTP POST: /playback):
+<blockquote>
+curl -i -X POST -d "device=192.168.0.22&state=pause" http://192.168.0.50:8080/playback
+</blockquote>
+</li>
+<li>Play playback state (HTTP POST: /playback):
+<blockquote>
+curl -i -X POST -d "device=192.168.0.22&state=play" http://192.168.0.50:8080/playback
+</blockquote>
+</li>
+<li>Stop playback state (and close app) (HTTP POST: /playback):
+<blockquote>
+curl -i -X POST -d "device=192.168.0.22&state=stop" http://192.168.0.50:8080/playback
+</blockquote>
+</li>
+</ul>
+</p>
 
 <p>ChromeCast devices only support a limited number of <a href="https://developers.google.com/cast/supported_media_types">media formats</a>.
 Caster has experimental support for converting other media formats into <a href="http://en.wikipedia.org/wiki/WebM">WebM</a> using the <a href="https://github.com/caprica/vlcj">vlcj library</a> for <a href="http://www.videolan.org/index.html">VLC</a>. 

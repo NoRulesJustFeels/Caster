@@ -13,14 +13,18 @@
  */
 package com.entertailion.java.caster;
 
+import java.util.Properties;
+
+import com.entertailion.java.caster.HttpServer.Response;
+
 /**
  * @author leon_nicholls
- * 
+ *
  */
-public interface DeviceFinderListener {
+public interface WebListener {
 
-	public void discoveringDevices(DeviceFinder deviceFinder);
-
-	public void discoveredDevices(DeviceFinder deviceFinder);
+	public Response handleRequest(String uri, String method, Properties header, Properties parms);
+	
+	public String[] uriPrefixes();
 
 }

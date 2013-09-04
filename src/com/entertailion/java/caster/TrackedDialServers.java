@@ -95,6 +95,10 @@ public class TrackedDialServers implements Iterable<DialServer> {
 		return byIp;
 	}
 
+	public DialServer findDialServer(InetAddress ipAddress) {
+		return serversByAddress.get(ipAddress);
+	}
+
 	public TrackedDialServers clone() {
 		TrackedDialServers trackedServers = new TrackedDialServers();
 		for (DialServer server : servers) {

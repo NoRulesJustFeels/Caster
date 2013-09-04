@@ -88,7 +88,7 @@ public class HttpServer {
 	/**
 	 * HTTP response. Return one of these from serve().
 	 */
-	public class Response {
+	public static class Response {
 		/**
 		 * Default constructor: response = HTTP_OK, data = mime = 'null'
 		 */

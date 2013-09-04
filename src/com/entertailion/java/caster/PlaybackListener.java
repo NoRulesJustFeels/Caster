@@ -13,11 +13,15 @@
  */
 package com.entertailion.java.caster;
 
+/**
+ * @author leon_nicholls
+ * 
+ */
 public interface PlaybackListener {
 
-	public void updateTime(RampClient rampClient, int time);
+	public void updateTime(Playback playback, int time);
 
-	public void updateDuration(RampClient rampClient, int duration);
+	public void updateDuration(Playback playback, int duration);
 
-	public void updateState(RampClient rampClient, int state);
+	public void updateState(Playback playback, int state);
 }

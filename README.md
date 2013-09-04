@@ -13,18 +13,20 @@ Caster provides several command line options which are self-documented with the 
 ```
 java -jar caster.jar -h
 usage: java -jar caster.jar [-d <arg>] [-f <arg>] [-h] [-id <arg>] [-l] [-r]
-       [-s] [-t] [-tp <arg>] [-v] [-V]
+       [-rp <arg>] [-s] [-t] [-tp <arg>] [-v] [-V]
   -d,--device <arg>                 ChromeCast device IP address
   -f,--file <arg>                   Local media file; -d also required
   -h,--help                         Print this help message
   -id,--app-id <arg>                App ID for whitelisted device
   -l,--list                         List ChromeCast devices
   -r,--rest                         REST API server
+  -rp,--rest-port <arg>             REST API port; default 8080
   -s,--stream                       HTTP URL for streaming content; -d also required
   -t,--transcode                    Transcode media; -f also required
   -tp,--transcode-parameters <arg>  Transcode parameters; -t also required
-  -v,--verbose                      Verbose logging
+  -v,--verbose                      Verbose debug logging
   -V,--version                      Print version information
+
 ```
 
 <p>Here are some examples of using Caster:
@@ -54,7 +56,7 @@ java -jar caster.jar -d 192.168.0.22 -t -f "/Users/leon_nicholls/Downloads/video
 java -jar caster.jar -d 192.168.0.22 -t -tp "vcodec=VP80,vb=2000,vfilter=canvas{width=640,height=360}, acodec=vorb,ab=128,channels=2,samplerate=44100,threads=2" -f "/Users/leon_nicholls/Downloads/video.wmv"
 </blockquote>
 </li>
-<li>Start the REST API server:
+<li>Start the REST API server on the default port 8080:
 <blockquote>
 java -jar caster.jar -r
 </blockquote>

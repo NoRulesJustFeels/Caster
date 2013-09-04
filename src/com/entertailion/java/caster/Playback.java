@@ -249,6 +249,13 @@ public class Playback {
 	 * ChromeCast device
 	 */
 	public static void startWebserver(WebListener weblistener) {
+		startWebserver(EmbeddedServer.HTTP_PORT, weblistener);
+	}
+	
+	public static void startWebserver(int customPort, WebListener weblistener) {
+		if (customPort>0) {
+			port = customPort;
+		}
 		boolean started = false;
 		while (!started) {
 			try {

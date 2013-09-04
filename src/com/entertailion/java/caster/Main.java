@@ -59,7 +59,7 @@ public class Main {
 		Option help = new Option("h", "help", false, "Print this help message");
 		Option version = new Option("V", "version", false, "Print version information");
 		Option list = new Option("l", "list", false, "List ChromeCast devices");
-		Option verbose = new Option("v", "verbose", false, "Verbose logging");
+		Option verbose = new Option("v", "verbose", false, "Verbose debug logging");
 		Option transcode = new Option("t", "transcode", false, "Transcode media; -f also required");
 		Option rest = new Option("r", "rest", false, "REST API server");
 
@@ -74,6 +74,9 @@ public class Main {
 
 		Option transcodingParameters = OptionBuilder.withLongOpt("transcode-parameters").hasArg().withValueSeparator()
 				.withDescription("Transcode parameters; -t also required").create("tp");
+		
+		Option restPort = OptionBuilder.withLongOpt("rest-port").hasArg().withValueSeparator().withDescription("REST API port; default 8080")
+		.create("rp");
 
 		Options options = new Options();
 		options.addOption(help);
@@ -87,6 +90,7 @@ public class Main {
 		options.addOption(transcode);
 		options.addOption(transcodingParameters);
 		options.addOption(rest);
+		options.addOption(restPort);
 		// create the command line parser
 		CommandLineParser parser = new PosixParser();
 
@@ -267,8 +271,17 @@ public class Main {
 
 				});
 				deviceFinder.discoverDevices();
+				
+				int port = 0;
+				if (line.hasOption("rp")) {
+					try {
+						port = Integer.parseInt(line.getOptionValue("rp"));
+					} catch (NumberFormatException e) {
+						Log.e(LOG_TAG, "invalid rest port", e);
+					}
+				}
 
-				Playback.startWebserver(new WebListener() {
+				Playback.startWebserver(port, new WebListener() {
 					String[] prefixes = { "/playback", "/devices" };
 					HashMap<String, Playback> playbackMap = new HashMap<String, Playback>();
 					HashMap<String, RestPlaybackListener> playbackListenerMap = new HashMap<String, RestPlaybackListener>();

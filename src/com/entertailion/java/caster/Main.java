@@ -46,7 +46,7 @@ public class Main {
 	// TODO Add your own app id here
 	private static final String APP_ID = "YOUR_APP_ID_HERE";
 
-	public static final String VERSION = "0.2";
+	public static final String VERSION = "0.3";
 
 	private static Platform platform = new Platform();
 	private static String appId = APP_ID;
@@ -132,7 +132,7 @@ public class Main {
 						Log.d(LOG_TAG, "discoveredDevices");
 						TrackedDialServers trackedDialServers = deviceFinder.getTrackedDialServers();
 						for (DialServer dialServer : trackedDialServers) {
-							Log.d(LOG_TAG, dialServer.toString());
+							System.out.println(dialServer.toString());  // keep system for output
 						}
 					}
 

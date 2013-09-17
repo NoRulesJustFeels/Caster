@@ -110,14 +110,22 @@ public class RampClient implements RampWebSocketListener {
 	private DialServer dialServer;
 	private Playback playback;
 	private PlaybackListener playbackListener;
+	private DefaultHttpClient defaultHttpClient;
+	private BasicHttpContext localContext;
+	private CustomRedirectHandler handler;
 
 	public RampClient(Playback playback, PlaybackListener playbackListener) {
 		this.playback = playback;
 		this.playbackListener = playbackListener;
 		this.senderId = UUID.randomUUID().toString();
+
+		defaultHttpClient = HttpRequestHelper.createHttpClient();
+		handler = new CustomRedirectHandler();
+		defaultHttpClient.setRedirectHandler(handler);
+		localContext = new BasicHttpContext();
 	}
 
-	public void launchApp(String app, DialServer dialServer) {
+	public void launchApp(String app, DialServer dialServer, String body) {
 		this.app = app;
 		// TODO
 		// /this.isChromeCast = app.equals(FlingFrame.CHROMECAST);
@@ -131,11 +139,6 @@ public class RampClient implements RampWebSocketListener {
 
 				// application instance url
 				String location = null;
-
-				DefaultHttpClient defaultHttpClient = HttpRequestHelper.createHttpClient();
-				CustomRedirectHandler handler = new CustomRedirectHandler();
-				defaultHttpClient.setRedirectHandler(handler);
-				BasicHttpContext localContext = new BasicHttpContext();
 
 				// check if any app is running
 				HttpGet httpGet = new HttpGet(dialServer.getAppsUrl());
@@ -191,6 +194,9 @@ public class RampClient implements RampWebSocketListener {
 				// Check if app is installed on device
 				int responseCode = getAppStatus(defaultHttpClient, dialServer.getAppsUrl() + app);
 				if (responseCode != 200) {
+					if (responseCode == 404) {
+						Log.e(LOG_TAG, "APP ID is invalid");
+					}
 					return;
 				}
 				parseXml(new StringReader(response));
@@ -210,6 +216,9 @@ public class RampClient implements RampWebSocketListener {
 					// httpPost.setEntity(new
 					// StringEntity("v=release-d4fa0a24f89ec5ba83f7bf3324282c8d046bf612&id=local%3A1&idle=windowclose"));
 					httpPost.setEntity(new StringEntity("v=release-d4fa0a24f89ec5ba83f7bf3324282c8d046bf612&id=local%3A1"));
+				}
+				if (body!=null) {
+					httpPost.setEntity(new StringEntity(body));  // http://www.youtube.com/watch?v=cKG5HDyTW8o
 				}
 
 				httpResponse = defaultHttpClient.execute(httpPost, localContext);
@@ -232,105 +241,116 @@ public class RampClient implements RampWebSocketListener {
 					return;
 				}
 
-				// Keep trying to get the app status until the
-				// connection service URL is available
-				state = STATE_STOPPED;
-				do {
-					responseCode = getAppStatus(defaultHttpClient, dialServer.getAppsUrl() + app);
-					if (responseCode != 200) {
-						break;
-					}
-					parseXml(new StringReader(response));
-					Log.d(LOG_TAG, "state=" + state);
-					Log.d(LOG_TAG, "connectionServiceUrl=" + connectionServiceUrl);
-					Log.d(LOG_TAG, "protocol=" + protocol);
-					try {
-						Thread.sleep(1000);
-					} catch (Exception e) {
-					}
-				} while (state.equals(STATE_RUNNING) && connectionServiceUrl == null);
-
-				if (connectionServiceUrl == null) {
-					Log.i(LOG_TAG, "connectionServiceUrl is null");
-					return; // oops, something went wrong
-				}
-
-				// get the websocket URL
-				String webSocketAddress = null;
-				httpPost = new HttpPost(connectionServiceUrl); // "http://192.168.0.17:8008/connection/YouTube"
-				httpPost.setHeader(HEADER_CONNECTION, HEADER_CONNECTION_VALUE);
-				httpPost.setHeader(HEADER_ORIGN, HEADER_ORIGIN_VALUE);
-				httpPost.setHeader(HEADER_USER_AGENT, HEADER_USER_AGENT_VALUE);
-				httpPost.setHeader(HEADER_DNT, HEADER_DNT_VALUE);
-				httpPost.setHeader(HEADER_ACCEPT_ENCODING, HEADER_ACCEPT_ENCODING_VALUE);
-				httpPost.setHeader(HEADER_ACCEPT, HEADER_ACCEPT_VALUE);
-				httpPost.setHeader(HEADER_ACCEPT_LANGUAGE, HEADER_ACCEPT_LANGUAGE_VALUE);
-				httpPost.setHeader(HEADER_CONTENT_TYPE, HEADER_CONTENT_TYPE_JSON_VALUE);
-				httpPost.setEntity(new StringEntity("{\"channel\":0,\"senderId\":{\"appName\":\"" + app + "\", \"senderId\":\"" + senderId + "\"}}"));
-
-				httpResponse = defaultHttpClient.execute(httpPost, localContext);
-				if (httpResponse != null) {
-					responseCode = httpResponse.getStatusLine().getStatusCode();
-					Log.d(LOG_TAG, "post response code=" + responseCode);
-					if (responseCode == 200) {
-						// should return JSON payload
-						response = EntityUtils.toString(httpResponse.getEntity());
-						Log.d(LOG_TAG, "post response=" + response);
-						Header[] headers = httpResponse.getAllHeaders();
-						for (int i = 0; i < headers.length; i++) {
-							Log.d(LOG_TAG, headers[i].getName() + "=" + headers[i].getValue());
-						}
-
-						// http://code.google.com/p/json-simple/
-						JSONParser parser = new JSONParser();
-						try {
-							Object obj = parser.parse(new StringReader(response)); // {"URL":"ws://192.168.0.17:8008/session?33","pingInterval":0}
-							JSONObject jsonObject = (JSONObject) obj;
-							webSocketAddress = (String) jsonObject.get("URL");
-							Log.d(LOG_TAG, "webSocketAddress: " + webSocketAddress);
-							long pingInterval = (Long) jsonObject.get("pingInterval"); // TODO
-						} catch (Exception e) {
-							Log.e(LOG_TAG, "parse JSON", e);
-						}
-					}
-				} else {
-					Log.i(LOG_TAG, "no post response");
-					return;
-				}
-
-				// Make a web socket connection for doing RAMP
-				// to control media playback
-				this.started = false;
-				this.closed = false;
-				this.gotStatus = false;
-				if (webSocketAddress != null) {
-					// https://github.com/TooTallNate/Java-WebSocket
-					URI uri = URI.create(webSocketAddress);
-
-					rampWebSocketClient = new RampWebSocketClient(uri, this);
-
-					new Thread(new Runnable() {
-						public void run() {
-							Thread t = new Thread(rampWebSocketClient);
-							t.start();
-							try {
-								t.join();
-							} catch (InterruptedException e1) {
-								e1.printStackTrace();
-							} finally {
-								rampWebSocketClient.close();
-							}
-						}
-					}).start();
-				} else {
-					Log.i(LOG_TAG, "webSocketAddress is null");
-				}
-
+				getWebSocket(app);
 			} catch (Exception e) {
 				Log.e(LOG_TAG, "launchApp", e);
 			}
 		} else {
 			Log.d(LOG_TAG, "launchApp: dialserver null");
+		}
+	}
+
+	private void getWebSocket(String app) {
+		try {
+			int responseCode = 0;
+			// Keep trying to get the app status until the
+			// connection service URL is available
+			state = STATE_STOPPED;
+			do {
+				responseCode = getAppStatus(defaultHttpClient, dialServer.getAppsUrl() + app);
+				if (responseCode != 200) {
+					if (responseCode == 404) {
+						Log.e(LOG_TAG, "APP ID is invalid");
+					}
+					break;
+				}
+				parseXml(new StringReader(response));
+				Log.d(LOG_TAG, "state=" + state);
+				Log.d(LOG_TAG, "connectionServiceUrl=" + connectionServiceUrl);
+				Log.d(LOG_TAG, "protocol=" + protocol);
+				try {
+					Thread.sleep(1000);
+				} catch (Exception e) {
+				}
+			} while (state.equals(STATE_RUNNING) && connectionServiceUrl == null);
+
+			if (connectionServiceUrl == null) {
+				Log.i(LOG_TAG, "connectionServiceUrl is null");
+				return; // oops, something went wrong
+			}
+
+			// get the websocket URL
+			String webSocketAddress = null;
+			HttpPost httpPost = new HttpPost(connectionServiceUrl); // "http://192.168.0.17:8008/connection/YouTube"
+			httpPost.setHeader(HEADER_CONNECTION, HEADER_CONNECTION_VALUE);
+			httpPost.setHeader(HEADER_ORIGN, HEADER_ORIGIN_VALUE);
+			httpPost.setHeader(HEADER_USER_AGENT, HEADER_USER_AGENT_VALUE);
+			httpPost.setHeader(HEADER_DNT, HEADER_DNT_VALUE);
+			httpPost.setHeader(HEADER_ACCEPT_ENCODING, HEADER_ACCEPT_ENCODING_VALUE);
+			httpPost.setHeader(HEADER_ACCEPT, HEADER_ACCEPT_VALUE);
+			httpPost.setHeader(HEADER_ACCEPT_LANGUAGE, HEADER_ACCEPT_LANGUAGE_VALUE);
+			httpPost.setHeader(HEADER_CONTENT_TYPE, HEADER_CONTENT_TYPE_JSON_VALUE);
+			httpPost.setEntity(new StringEntity("{\"channel\":0,\"senderId\":{\"appName\":\"" + app + "\", \"senderId\":\"" + senderId + "\"}}"));
+
+			HttpResponse httpResponse = defaultHttpClient.execute(httpPost, localContext);
+			if (httpResponse != null) {
+				responseCode = httpResponse.getStatusLine().getStatusCode();
+				Log.d(LOG_TAG, "post response code=" + responseCode);
+				if (responseCode == 200) {
+					// should return JSON payload
+					response = EntityUtils.toString(httpResponse.getEntity());
+					Log.d(LOG_TAG, "post response=" + response);
+					Header[] headers = httpResponse.getAllHeaders();
+					for (int i = 0; i < headers.length; i++) {
+						Log.d(LOG_TAG, headers[i].getName() + "=" + headers[i].getValue());
+					}
+
+					// http://code.google.com/p/json-simple/
+					JSONParser parser = new JSONParser();
+					try {
+						Object obj = parser.parse(new StringReader(response)); // {"URL":"ws://192.168.0.17:8008/session?33","pingInterval":0}
+						JSONObject jsonObject = (JSONObject) obj;
+						webSocketAddress = (String) jsonObject.get("URL");
+						Log.d(LOG_TAG, "webSocketAddress: " + webSocketAddress);
+						long pingInterval = (Long) jsonObject.get("pingInterval"); // TODO
+					} catch (Exception e) {
+						Log.e(LOG_TAG, "parse JSON", e);
+					}
+				}
+			} else {
+				Log.i(LOG_TAG, "no post response");
+				return;
+			}
+
+			// Make a web socket connection for doing RAMP
+			// to control media playback
+			this.started = false;
+			this.closed = false;
+			this.gotStatus = false;
+			if (webSocketAddress != null) {
+				// https://github.com/TooTallNate/Java-WebSocket
+				URI uri = URI.create(webSocketAddress);
+
+				rampWebSocketClient = new RampWebSocketClient(uri, this);
+
+				new Thread(new Runnable() {
+					public void run() {
+						Thread t = new Thread(rampWebSocketClient);
+						t.start();
+						try {
+							t.join();
+						} catch (InterruptedException e1) {
+							e1.printStackTrace();
+						} finally {
+							rampWebSocketClient.close();
+						}
+					}
+				}).start();
+			} else {
+				Log.i(LOG_TAG, "webSocketAddress is null");
+			}
+		} catch (Exception e) {
+			Log.e(LOG_TAG, "getWebSocket", e);
 		}
 	}
 
@@ -398,6 +418,56 @@ public class RampClient implements RampWebSocketListener {
 		} else {
 			Log.d(LOG_TAG, "closeCurrentApp: dialserver null");
 		}
+	}
+
+	public String getCurrentApp(DialServer dialServer) {
+		if (dialServer != null) {
+			try {
+				DefaultHttpClient defaultHttpClient = HttpRequestHelper.createHttpClient();
+				CustomRedirectHandler handler = new CustomRedirectHandler();
+				defaultHttpClient.setRedirectHandler(handler);
+				BasicHttpContext localContext = new BasicHttpContext();
+
+				// check if any app is running
+				HttpGet httpGet = new HttpGet(dialServer.getAppsUrl());
+				httpGet.setHeader(HEADER_CONNECTION, HEADER_CONNECTION_VALUE);
+				httpGet.setHeader(HEADER_USER_AGENT, HEADER_USER_AGENT_VALUE);
+				httpGet.setHeader(HEADER_ACCEPT, HEADER_ACCEPT_VALUE);
+				httpGet.setHeader(HEADER_DNT, HEADER_DNT_VALUE);
+				httpGet.setHeader(HEADER_ACCEPT_ENCODING, HEADER_ACCEPT_ENCODING_VALUE);
+				httpGet.setHeader(HEADER_ACCEPT_LANGUAGE, HEADER_ACCEPT_LANGUAGE_VALUE);
+				HttpResponse httpResponse = defaultHttpClient.execute(httpGet);
+				if (httpResponse != null) {
+					int responseCode = httpResponse.getStatusLine().getStatusCode();
+					Log.d(LOG_TAG, "get response code=" + httpResponse.getStatusLine().getStatusCode());
+					if (responseCode == 204) {
+						// nothing is running
+					} else if (responseCode == 200) {
+						// app is running
+
+						// Need to get real URL after a redirect
+						// http://stackoverflow.com/a/10286025/594751
+						String lastUrl = dialServer.getAppsUrl();
+						if (handler.lastRedirectedUri != null) {
+							lastUrl = handler.lastRedirectedUri.toString();
+							Log.d(LOG_TAG, "lastUrl=" + lastUrl);
+							String[] parts = lastUrl.split("/");
+							if (parts.length > 0) {
+								return parts[parts.length - 1];
+							}
+						}
+					}
+
+				} else {
+					Log.i(LOG_TAG, "no get response");
+				}
+			} catch (Exception e) {
+				Log.e(LOG_TAG, "getCurrentApp", e);
+			}
+		} else {
+			Log.d(LOG_TAG, "getCurrentApp: dialserver null");
+		}
+		return null;
 	}
 
 	/**
@@ -505,12 +575,6 @@ public class RampClient implements RampWebSocketListener {
 					JSONObject status = (JSONObject) body.get(RESPONSE_STATUS);
 					if (status.get(RESPONSE_CURRENT_TIME) instanceof Double) {
 						Double current_time = (Double) status.get(RESPONSE_CURRENT_TIME);
-						Double duration = (Double) status.get(RESPONSE_DURATION);
-						if (duration != null) {
-							if (playbackListener != null) {
-								playbackListener.updateDuration(playback, duration.intValue());
-							}
-						}
 						if (current_time != null) {
 							if (playbackListener != null) {
 								playbackListener.updateTime(playback, current_time.intValue());
@@ -518,15 +582,24 @@ public class RampClient implements RampWebSocketListener {
 						}
 					} else {
 						Long current_time = (Long) status.get(RESPONSE_CURRENT_TIME);
+						if (current_time != null) {
+							if (playbackListener != null) {
+								playbackListener.updateTime(playback, current_time.intValue());
+							}
+						}
+					}
+					if (status.get(RESPONSE_DURATION) instanceof Double) {
 						Double duration = (Double) status.get(RESPONSE_DURATION);
 						if (duration != null) {
 							if (playbackListener != null) {
 								playbackListener.updateDuration(playback, duration.intValue());
 							}
 						}
-						if (current_time != null) {
+					} else {
+						Long duration = (Long) status.get(RESPONSE_DURATION);
+						if (duration != null) {
 							if (playbackListener != null) {
-								playbackListener.updateTime(playback, current_time.intValue());
+								playbackListener.updateDuration(playback, duration.intValue());
 							}
 						}
 					}
@@ -640,6 +713,12 @@ public class RampClient implements RampWebSocketListener {
 
 	// Media playback controls
 	public void play() {
+		Log.d(LOG_TAG, "play: " + rampWebSocketClient);
+		if (rampWebSocketClient == null) {
+			String app = getCurrentApp(dialServer);
+			Log.d(LOG_TAG, "play: currentApp=" + app);
+			getWebSocket(app);
+		}
 		if (rampWebSocketClient != null) {
 			rampWebSocketClient.send("[\"ramp\",{\"type\":\"PLAY\", \"cmd_id\":" + commandId + "}]");
 			commandId++;
@@ -647,6 +726,12 @@ public class RampClient implements RampWebSocketListener {
 	}
 
 	public void play(int position) {
+		Log.d(LOG_TAG, "play: " + rampWebSocketClient);
+		if (rampWebSocketClient == null) {
+			String app = getCurrentApp(dialServer);
+			Log.d(LOG_TAG, "play: currentApp=" + app);
+			getWebSocket(app);
+		}
 		if (rampWebSocketClient != null) {
 			rampWebSocketClient.send("[\"ramp\",{\"type\":\"PLAY\", \"cmd_id\":" + commandId + ", \"position\":" + position + "}]");
 			commandId++;
@@ -655,6 +740,11 @@ public class RampClient implements RampWebSocketListener {
 
 	public void pause() {
 		Log.d(LOG_TAG, "pause: " + rampWebSocketClient);
+		if (rampWebSocketClient == null) {
+			String app = getCurrentApp(dialServer);
+			Log.d(LOG_TAG, "stop: currentApp=" + app);
+			getWebSocket(app);
+		}
 		if (rampWebSocketClient != null) {
 			rampWebSocketClient.send("[\"ramp\",{\"type\":\"STOP\", \"cmd_id\":" + commandId + "}]");
 			commandId++;
@@ -712,5 +802,9 @@ public class RampClient implements RampWebSocketListener {
 
 	public boolean isClosed() {
 		return closed;
+	}
+
+	public void setDialServer(DialServer dialServer) {
+		this.dialServer = dialServer;
 	}
 }

@@ -18,6 +18,7 @@ package com.entertailion.java.caster;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.util.LinkedList;
 
 import org.java_websocket.WebSocketImpl;
 import org.java_websocket.client.WebSocketClient;
@@ -35,6 +36,11 @@ public class RampWebSocketClient extends WebSocketClient {
 	private static final String LOG_TAG = "RampWebSocketClient";
 
 	private RampWebSocketListener rampWebSocketListener;
+
+	// Queue messages until the connection is ready
+	private LinkedList<String> messageQueue = new LinkedList<String>();
+
+	private boolean ready;
 
 	public RampWebSocketClient(URI uri, RampWebSocketListener rampWebSocketListener) {
 		super(uri, new Draft_17());
@@ -59,6 +65,11 @@ public class RampWebSocketClient extends WebSocketClient {
 
 	@Override
 	public void onOpen(ServerHandshake handshake) {
+		ready = true;
+		for (String msg : messageQueue) {
+			super.send(msg);
+		}
+		messageQueue.clear();
 		rampWebSocketListener.onOpen(handshake);
 	}
 
@@ -70,7 +81,15 @@ public class RampWebSocketClient extends WebSocketClient {
 	@Override
 	public void send(String message) {
 		Log.d(LOG_TAG, "message=" + message);
-		super.send(message);
+		if (ready) {
+			for (String msg : messageQueue) {
+				super.send(msg);
+			}
+			messageQueue.clear();
+			super.send(message);
+		} else {
+			messageQueue.add(message);
+		}
 	}
 
 }

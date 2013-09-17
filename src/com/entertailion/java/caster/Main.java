@@ -44,9 +44,9 @@ public class Main {
 	private static final String LOG_TAG = "Main";
 
 	// TODO Add your own app id here
-	private static final String APP_ID = "YOUR_APP_ID_HERE";
+	private static final String APP_ID = "YOUR_APP_ID";
 
-	public static final String VERSION = "0.3";
+	public static final String VERSION = "0.4";
 
 	private static Platform platform = new Platform();
 	private static String appId = APP_ID;
@@ -445,6 +445,9 @@ public class Main {
 											}
 											Playback playback = playbackMap.get(device);
 											if (playback != null) {
+												// Handle case where current app wasn't started with caster
+												playback.setDialServer(deviceFinder.getTrackedDialServers().findDialServer(InetAddress.getByName(device)));
+												// Change the playback state
 												if (state.equals("play")) {
 													playback.doPlay();
 													return new Response(HttpServer.HTTP_OK, "text/plain", "Ok");
@@ -456,6 +459,8 @@ public class Main {
 													playbackMap.remove(device);
 													playbackListenerMap.remove(device);
 													return new Response(HttpServer.HTTP_OK, "text/plain", "Ok");
+												} else {
+													Log.e(LOG_TAG, "playback invalid state: "+state);
 												}
 											}
 										} catch (Exception e1) {
@@ -475,6 +480,7 @@ public class Main {
 					}
 
 				});
+				Log.d(LOG_TAG, "REST server ready");
 
 				// Run forever...
 				while (true) {

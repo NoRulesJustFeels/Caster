@@ -64,11 +64,12 @@ public class Playback {
 	}
 
 	public void stream(final String u) {
+		Log.d(LOG_TAG, "stream: " + rampClient);
 		if (!rampClient.isClosed()) {
 			rampClient.closeCurrentApp(dialServer);
 		}
 		if (dialServer != null) {
-			rampClient.launchApp(appId, dialServer);
+			rampClient.launchApp(appId, dialServer, null);
 			// wait for socket to be ready...
 			new Thread(new Runnable() {
 				public void run() {
@@ -90,6 +91,18 @@ public class Playback {
 			}).start();
 		} else {
 			Log.d(LOG_TAG, "stream: dialserver null");
+		}
+	}
+	
+	public void launch(final String body) {
+		Log.d(LOG_TAG, "launch: " + rampClient);
+		if (!rampClient.isClosed()) {
+			rampClient.closeCurrentApp(dialServer);
+		}
+		if (dialServer != null) {
+			rampClient.launchApp(appId, dialServer, body);
+		} else {
+			Log.d(LOG_TAG, "launch: dialserver null");
 		}
 	}
 
@@ -182,33 +195,10 @@ public class Playback {
 					mediaUrl = "http://" + address.getHostAddress() + ":" + port + "/video" + extension;
 				}
 				Log.d(LOG_TAG, "mediaUrl=" + mediaUrl);
-				/*
-				 * final RampClient rampClient = new RampClient(new
-				 * PlaybackListener() { private int time; private int duration;
-				 * private int state;
-				 * 
-				 * @Override public void updateTime(RampClient rampClient, int
-				 * time) { Log.d(LOG_TAG, "updateTime: " + time); this.time =
-				 * time; }
-				 * 
-				 * @Override public void updateDuration(RampClient rampClient,
-				 * int duration) { Log.d(LOG_TAG, "updateDuration: " +
-				 * duration); this.duration = duration; }
-				 * 
-				 * @Override public void updateState(RampClient rampClient, int
-				 * state) { Log.d(LOG_TAG, "updateState: " + state); // Stop the
-				 * app if the video reaches the end if (time > 0 && time ==
-				 * duration && state == 0) { stop(rampClient); } }
-				 * 
-				 * private void stop(RampClient rampClient) { doStop();
-				 * System.exit(0); }
-				 * 
-				 * });
-				 */
 				if (!rampClient.isClosed()) {
 					rampClient.closeCurrentApp(dialServer);
 				}
-				rampClient.launchApp(appId, dialServer);
+				rampClient.launchApp(appId, dialServer, null);
 				final String playbackUrl = mediaUrl;
 				// wait for socket to be ready...
 				new Thread(new Runnable() {
@@ -251,9 +241,9 @@ public class Playback {
 	public static void startWebserver(WebListener weblistener) {
 		startWebserver(EmbeddedServer.HTTP_PORT, weblistener);
 	}
-	
+
 	public static void startWebserver(int customPort, WebListener weblistener) {
-		if (customPort>0) {
+		if (customPort > 0) {
 			port = customPort;
 		}
 		boolean started = false;
@@ -316,7 +306,7 @@ public class Playback {
 	public void doStop() {
 		if (rampClient != null) {
 			rampClient.closeCurrentApp(dialServer);
-			rampClient = null;
+			//rampClient = null;
 		}
 		if (!isTranscoding) {
 			if (embeddedServer != null) {
@@ -345,6 +335,17 @@ public class Playback {
 		Log.d(LOG_TAG, "doPause: " + rampClient);
 		if (rampClient != null) {
 			rampClient.pause();
+		}
+	}
+
+	public DialServer getDialServer() {
+		return dialServer;
+	}
+
+	public void setDialServer(DialServer dialServer) {
+		this.dialServer = dialServer;
+		if (rampClient != null) {
+			rampClient.setDialServer(dialServer);
 		}
 	}
 
